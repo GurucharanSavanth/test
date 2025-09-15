@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pet Care Market Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- D3.js CDN for CSV parsing -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        /* Custom font and scrollbar for a better look */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280;
+        }
+        /* Style for brand checklist */
+        .brand-checklist {
+            max-height: 120px;
+            overflow-y: auto;
+            background-color: #374151; /* gray-700 */
+            padding: 8px;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <!-- Header Section -->
+        <header class="mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-white">Pet Care Market Insights</h1>
+            <p class="text-gray-400 mt-1">Dynamic dashboard based on market research data.</p>
+        </header>
+
+        <!-- File Upload Section -->
+        <div class="bg-gray-800 p-4 rounded-lg shadow-lg mb-8">
+            <label for="csvFileInput" class="block text-lg font-medium text-gray-300 mb-2">Upload Pet Care Market Data (.csv)</label>
+            <div class="flex items-center space-x-4">
+                 <input type="file" id="csvFileInput" accept=".csv" class="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer"/>
+            </div>
+            <p id="file-info" class="text-sm text-gray-500 mt-2"></p>
+        </div>
+        
+        <!-- This div will be shown only after a file is successfully uploaded -->
+        <div id="dashboardContent" class="hidden">
+            <!-- Filters Section -->
+            <div class="bg-gray-800 p-4 rounded-lg shadow-lg mb-8 flex flex-col sm:flex-row gap-4 items-center">
+                <div class="w-full sm:w-auto">
+                    <label for="categoryFilter" class="block text-sm font-medium text-gray-300 mb-1">Category</label>
+                    <select id="categoryFilter" class="w-full bg-gray-700 text-white border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="all">All Categories</option>
+                    </select>
+                </div>
+                <div class="w-full sm:w-auto">
+                    <label for="brandFilter" class="block text-sm font-medium text-gray-300 mb-1">Brand</label>
+                    <select id="brandFilter" class="w-full bg-gray-700 text-white border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="all">All Brands</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Key Outcomes Section -->
+            <div class="bg-gray-800 p-5 rounded-lg shadow-lg mb-8">
+                <h3 class="text-lg font-semibold text-white mb-3">Key Outcomes from Data</h3>
+                <div id="data-summary" class="text-gray-300 space-y-2 text-sm">
+                    <p>Analysis will appear here...</p>
+                </div>
+            </div>
+
+            <!-- KPI Cards Section -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="bg-gray-800 p-5 rounded-lg shadow-lg flex flex-col justify-between">
+                    <h3 class="text-sm font-medium text-gray-400">Avg. Satisfaction Index</h3>
+                    <p id="avgSatisfaction" class="text-3xl font-bold text-white mt-2">--</p>
+                </div>
+                <div class="bg-gray-800 p-5 rounded-lg shadow-lg flex flex-col justify-between">
+                    <h3 class="text-sm font-medium text-gray-400">Avg. Price / kg (INR)</h3>
+                    <p id="avgPrice" class="text-3xl font-bold text-white mt-2">--</p>
+                </div>
+                <div class="bg-gray-800 p-5 rounded-lg shadow-lg flex flex-col justify-between">
+                    <h3 class="text-sm font-medium text-gray-400">Avg. Repeat Rate</h3>
+                    <p id="avgRepeatRate" class="text-3xl font-bold text-white mt-2">--</p>
+                </div>
+                <div class="bg-gray-800 p-5 rounded-lg shadow-lg flex flex-col justify-between">
+                    <h3 class="text-sm font-medium text-gray-400">Data Points</h3>
+                    <p id="dataPoints" class="text-3xl font-bold text-white mt-2">--</p>
+                </div>
+            </div>
+
+            <!-- Charts Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Chart 1: Market Growth Over Time -->
+                <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
+                    <h3 class="text-lg font-semibold mb-2 text-white">Market Growth Over Time (%)</h3>
+                    <canvas id="growthChart"></canvas>
+                </div>
+                <!-- Chart 2: Brand Performance Funnel -->
+                <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
+                    <h3 class="text-lg font-semibold mb-2 text-white">Brand Performance Funnel</h3>
+                    <canvas id="funnelChart"></canvas>
+                </div>
+                <!-- Chart 3: Category Distribution -->
+                <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
+                    <h3 class="text-lg font-semibold mb-2 text-white">Category Distribution by Sample Size</h3>
+                    <canvas id="categoryChart"></canvas>
+                </div>
+                <!-- Chart 4: Price vs. Satisfaction -->
+                <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
+                    <h3 class="text-lg font-semibold mb-2 text-white">Price vs. Satisfaction</h3>
+                    <canvas id="scatterChart"></canvas>
+                </div>
+                 <!-- Chart 5: Brand Comparison Radar Chart -->
+                <div class="bg-gray-800 p-4 rounded-lg shadow-lg lg:col-span-2">
+                    <h3 class="text-lg font-semibold mb-2 text-white">Brand Comparison</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div class="md:col-span-1">
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Select brands to compare:</label>
+                            <div id="brandChecklist" class="brand-checklist space-y-1"></div>
+                        </div>
+                        <div class="md:col-span-3" style="position: relative; height: 350px;">
+                             <canvas id="radarChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Initial Message, shown before file upload -->
+        <div id="initial-message" class="text-center p-16 bg-gray-800 rounded-lg shadow-lg">
+            <h2 class="text-2xl font-semibold text-white mb-2">Welcome!</h2>
+            <p class="text-gray-400">Please upload a CSV file to visualize the dashboard.</p>
+        </div>
+
+    </div>
+
+    <script type="module">
+        // --- CHART CONFIGURATION ---
+        Chart.defaults.color = 'rgba(209, 213, 219, 0.7)'; 
+        Chart.defaults.borderColor = 'rgba(75, 85, 99, 0.7)';
+
+        // --- DOM ELEMENT REFERENCES ---
+        const categoryFilter = document.getElementById('categoryFilter');
+        const brandFilter = document.getElementById('brandFilter');
+        const csvFileInput = document.getElementById('csvFileInput');
+        const dashboardContent = document.getElementById('dashboardContent');
+        const initialMessage = document.getElementById('initial-message');
+        const fileInfo = document.getElementById('file-info');
+        const dataSummaryEl = document.getElementById('data-summary');
+        const brandChecklistEl = document.getElementById('brandChecklist');
+
+        // --- CHART INSTANCES & GLOBAL DATA ---
+        let growthChart, funnelChart, categoryChart, scatterChart, radarChart;
+        let masterData = [];
+        let globalMinPrice, globalMaxPrice, globalMinGrowth, globalMaxGrowth;
+
+        // --- DATA LOADING & INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            csvFileInput.addEventListener('change', handleFileUpload);
+        });
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            fileInfo.textContent = `Processing file: ${file.name}...`;
+            initialMessage.classList.add('hidden');
+            dashboardContent.classList.add('hidden');
+
+            const reader = new FileReader();
+
+            reader.onload = (e) => {
+                try {
+                    const fileContent = e.target.result;
+                    const data = d3.csvParse(fileContent);
+
+                    const requiredColumns = ['month', 'category', 'brand', 'sample_size', 'satisfaction_index', 'market_growth_pct', 'funnel_conversation_idx', 'funnel_consideration_idx', 'funnel_trial_idx', 'funnel_repeat_idx', 'price_per_kg_inr', 'repeat_rate_pct'];
+                    const uploadedColumns = data.columns;
+                    const missingColumns = requiredColumns.filter(col => !uploadedColumns.includes(col));
+
+                    if (missingColumns.length > 0) {
+                        throw new Error(`Invalid CSV format. Missing columns: ${missingColumns.join(', ')}`);
+                    }
+
+                    masterData = data.map(d => ({...d, sample_size: +d.sample_size, satisfaction_index: +d.satisfaction_index, market_growth_pct: +d.market_growth_pct, funnel_conversation_idx: +d.funnel_conversation_idx, funnel_consideration_idx: +d.funnel_consideration_idx, funnel_trial_idx: +d.funnel_trial_idx, funnel_repeat_idx: +d.funnel_repeat_idx, price_per_kg_inr: +d.price_per_kg_inr, repeat_rate_pct: +d.repeat_rate_pct, date: parseMonth(d.month) }));
+
+                    // FIX: Calculate global min/max for consistent radar chart scaling across all filters
+                    [globalMinPrice, globalMaxPrice] = d3.extent(masterData, d => d.price_per_kg_inr);
+                    [globalMinGrowth, globalMaxGrowth] = d3.extent(masterData, d => d.market_growth_pct);
+
+                    [growthChart, funnelChart, categoryChart, scatterChart, radarChart].forEach(chart => chart?.destroy());
+
+                    populateFilters(masterData);
+                    populateBrandChecklist(masterData);
+                    initializeCharts();
+                    updateDashboard();
+
+                    categoryFilter.addEventListener('change', updateDashboard);
+                    brandFilter.addEventListener('change', updateDashboard);
+                    brandChecklistEl.addEventListener('change', updateDashboard);
+                    
+                    dashboardContent.classList.remove('hidden');
+                    fileInfo.textContent = `Successfully loaded: ${file.name}`;
+
+                } catch (error) {
+                    console.error("Failed to load or process data:", error);
+                    initialMessage.innerHTML = `<h2 class="text-2xl font-semibold text-red-400 mb-2">Error!</h2><p class="text-gray-400">${error.message}</p>`;
+                    initialMessage.classList.remove('hidden');
+                    fileInfo.textContent = `Error processing ${file.name}.`;
+                }
+            };
+            
+            reader.onerror = (e) => {
+                console.error("FileReader error:", e);
+                initialMessage.textContent = "Error reading the file.";
+                initialMessage.classList.remove('hidden');
+                fileInfo.textContent = `Error reading ${file.name}.`;
+            };
+
+            reader.readAsText(file);
+        }
+
+        // --- UTILITY FUNCTIONS ---
+        const parseMonth = (monthStr) => {
+            if (!monthStr || !monthStr.includes('-')) return null;
+            const [mon, year] = monthStr.split('-');
+            const monthMap = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };
+            const fullYear = year && year.length === 2 ? `20${year}` : year;
+            if (!monthMap.hasOwnProperty(mon) || !fullYear) return null;
+            return new Date(fullYear, monthMap[mon]);
+        };
+        
+        const populateFilters = (data) => {
+            categoryFilter.innerHTML = '<option value="all">All Categories</option>';
+            brandFilter.innerHTML = '<option value="all">All Brands</option>';
+            
+            const categories = [...new Set(data.map(d => d.category))].sort();
+            const brands = [...new Set(data.map(d => d.brand))].sort();
+
+            categories.forEach(cat => categoryFilter.appendChild(new Option(cat, cat)));
+            brands.forEach(brand => brandFilter.appendChild(new Option(brand, brand)));
+        };
+
+        const populateBrandChecklist = (data) => {
+            brandChecklistEl.innerHTML = '';
+            const brands = [...new Set(data.map(d => d.brand))].sort();
+            brands.forEach(brand => {
+                const id = `brand-${brand.replace(/\s+/g, '-')}`;
+                const div = document.createElement('div');
+                div.className = 'flex items-center';
+                div.innerHTML = `<input id="${id}" type="checkbox" value="${brand}" class="h-4 w-4 rounded border-gray-500 bg-gray-600 text-indigo-600 focus:ring-indigo-500"><label for="${id}" class="ml-2 block text-sm text-gray-300">${brand}</label>`;
+                brandChecklistEl.appendChild(div);
+            });
+        };
+        
+        const getFilteredData = () => masterData.filter(d => (categoryFilter.value === 'all' || d.category === categoryFilter.value) && (brandFilter.value === 'all' || d.brand === brandFilter.value));
+        
+        // --- CHART INITIALIZATION ---
+        const initializeCharts = () => {
+            growthChart = new Chart(document.getElementById('growthChart').getContext('2d'), { type: 'line', data: { labels: [], datasets: [] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: false, ticks: { callback: value => `${value}%` } } }, plugins: { legend: { display: false } }, interaction: { mode: 'index', intersect: false }, elements: { line: { tension: 0.3 } } } });
+            funnelChart = new Chart(document.getElementById('funnelChart').getContext('2d'), { type: 'bar', data: { labels: [], datasets: [] }, options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { x: { beginAtZero: true, max: 100 } }, plugins: { legend: { display: false } } } });
+            categoryChart = new Chart(document.getElementById('categoryChart').getContext('2d'), { type: 'doughnut', data: { labels: [], datasets: [] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 12 } } } } });
+            scatterChart = new Chart(document.getElementById('scatterChart').getContext('2d'), { type: 'scatter', data: { datasets: [] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(context) { const dp = context.dataset.data[context.dataIndex]; return `${dp.brand}: (Price: ${context.parsed.x.toFixed(2)}, Satisfaction: ${context.parsed.y.toFixed(2)})`; } } } }, scales: { x: { title: { display: true, text: 'Price per kg (INR)' } }, y: { title: { display: true, text: 'Satisfaction Index' } } } } });
+            radarChart = new Chart(document.getElementById('radarChart').getContext('2d'), { type: 'radar', data: { labels: [], datasets: [] }, options: { responsive: true, maintainAspectRatio: false, scales: { r: { beginAtZero: true, max: 100, pointLabels: { color: 'white' }, grid: { color: 'rgba(255, 255, 255, 0.2)' }, angleLines: { color: 'rgba(255, 255, 255, 0.2)' } } }, plugins: { legend: { position: 'top' } } } });
+        };
+
+        function clearAllCharts() {
+            [growthChart, funnelChart, categoryChart, scatterChart, radarChart].forEach(chart => { if (chart) { chart.data.labels = []; chart.data.datasets = []; chart.update(); } });
+        }
+
+        // --- DASHBOARD UPDATE LOGIC ---
+        function updateDashboard() {
+            const data = getFilteredData();
+            if (!data.length) {
+                 document.getElementById('avgSatisfaction').textContent = '--';
+                 document.getElementById('avgPrice').textContent = '--';
+                 document.getElementById('avgRepeatRate').textContent = '--';
+                 document.getElementById('dataPoints').textContent = '0';
+                 dataSummaryEl.innerHTML = '<p>No data to analyze for the selected filters.</p>';
+                 clearAllCharts();
+                return;
+            }
+
+            updateKPIs(data);
+            generateDataSummary(data);
+            updateGrowthChart(data);
+            updateFunnelChart(data);
+            updateCategoryChart(data);
+            updateScatterChart(data);
+            updateRadarChart(); // Radar chart uses master data for scaling, but filtered data for selection
+        }
+
+        // --- INDIVIDUAL UPDATE FUNCTIONS ---
+        const updateKPIs = (data) => {
+            document.getElementById('avgSatisfaction').textContent = (d3.mean(data, d => d.satisfaction_index) || 0).toFixed(1);
+            document.getElementById('avgPrice').textContent = `₹${(d3.mean(data, d => d.price_per_kg_inr) || 0).toFixed(2)}`;
+            document.getElementById('avgRepeatRate').textContent = `${(d3.mean(data, d => d.repeat_rate_pct) || 0).toFixed(1)}%`;
+            document.getElementById('dataPoints').textContent = data.length;
+        };
+
+        const generateDataSummary = (data) => {
+            const groupedByBrand = d3.group(data, d => d.brand);
+            let topBrandSatisfaction = { name: 'N/A', value: 0 };
+            groupedByBrand.forEach((values, brand) => {
+                const avgSatisfaction = d3.mean(values, d => d.satisfaction_index);
+                if (avgSatisfaction > topBrandSatisfaction.value) {
+                    topBrandSatisfaction = { name: brand, value: avgSatisfaction };
+                }
+            });
+
+            const groupedByCategory = d3.group(data, d => d.category);
+            let topCatGrowth = { name: 'N/A', value: -Infinity };
+            groupedByCategory.forEach((values, category) => {
+                const avgGrowth = d3.mean(values, d => d.market_growth_pct);
+                if (avgGrowth > topCatGrowth.value) {
+                    topCatGrowth = { name: category, value: avgGrowth };
+                }
+            });
+
+            dataSummaryEl.innerHTML = `
+                <p>• <strong>Top Performer:</strong> <strong>${topBrandSatisfaction.name}</strong> leads with an average satisfaction index of <strong>${topBrandSatisfaction.value.toFixed(1)}</strong>.</p>
+                <p>• <strong>High-Growth Area:</strong> The <strong>${topCatGrowth.name}</strong> category shows the highest average market growth at <strong>${topCatGrowth.value.toFixed(1)}%</strong>.</p>
+            `;
+        };
+
+        const updateGrowthChart = (data) => {
+            const validData = data.filter(d => d.date instanceof Date).sort((a, b) => a.date - b.date);
+            const growthByMonth = d3.group(validData, d => d.date.toISOString().slice(0, 7));
+            const monthlyAvgGrowth = Array.from(growthByMonth, ([, values]) => ({ date: values[0].date, avgGrowth: d3.mean(values, d => d.market_growth_pct) })).sort((a, b) => a.date - b.date);
+
+            growthChart.data.labels = monthlyAvgGrowth.map(d => d.date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }));
+            growthChart.data.datasets = [{ label: 'Avg Market Growth', data: monthlyAvgGrowth.map(d => d.avgGrowth), borderColor: '#34d399', backgroundColor: 'rgba(52, 211, 153, 0.1)', fill: true }];
+            growthChart.update();
+        };
+        
+        const updateFunnelChart = (data) => {
+            funnelChart.data.labels = ['Conversation', 'Consideration', 'Trial', 'Repeat'];
+            funnelChart.data.datasets = [{ label: 'Funnel Index', data: [d3.mean(data, d => d.funnel_conversation_idx), d3.mean(data, d => d.funnel_consideration_idx), d3.mean(data, d => d.funnel_trial_idx), d3.mean(data, d => d.funnel_repeat_idx)], backgroundColor: ['#60a5fa', '#38bdf8', '#22d3ee', '#67e8f9'] }];
+            funnelChart.update();
+        };
+
+        const updateCategoryChart = (data) => {
+            const categoryTotals = d3.rollup(data, v => d3.sum(v, d => d.sample_size), d => d.category);
+            const sortedCategories = Array.from(categoryTotals.entries()).sort((a,b) => b[1] - a[1]);
+            categoryChart.data.labels = sortedCategories.map(d => d[0]);
+            categoryChart.data.datasets = [{ label: 'Sample Size', data: sortedCategories.map(d => d[1]), backgroundColor: ['#f87171', '#fb923c', '#facc15', '#a3e635', '#4ade80', '#34d399', '#22d3ee', '#60a5fa', '#818cf8', '#a78bfa', '#e879f9', '#f472b6'] }];
+            categoryChart.update();
+        };
+
+        const updateScatterChart = (data) => {
+            const brands = [...new Set(data.map(d => d.brand))];
+            const colorPalette = ['#f87171', '#fb923c', '#facc15', '#a3e635', '#4ade80', '#34d399', '#22d3ee', '#60a5fa', '#818cf8', '#a78bfa', '#e879f9', '#f472b6'];
+            scatterChart.data.datasets = [{ label: 'Brands', data: data.map(d => ({ x: d.price_per_kg_inr, y: d.satisfaction_index, brand: d.brand })), backgroundColor: (c) => colorPalette[brands.indexOf(c.raw.brand) % colorPalette.length], pointRadius: 5, pointHoverRadius: 7 }];
+            scatterChart.update();
+        };
+
+        const updateRadarChart = () => {
+            const selectedBrands = Array.from(brandChecklistEl.querySelectorAll('input:checked')).map(input => input.value);
+            const colorPalette = ['#a78bfa', '#f472b6', '#34d399', '#facc15', '#60a5fa', '#fb923c'];
+            const data = getFilteredData(); // Use filtered data for brand selection context
+
+            radarChart.data.labels = ['Satisfaction', 'Value for Money', 'Repeat Rate', 'Growth'];
+            
+            radarChart.data.datasets = selectedBrands.map((brand, i) => {
+                const brandData = masterData.filter(d => d.brand === brand); // Use master data for calculation
+                const avgSatisfaction = d3.mean(brandData, d => d.satisfaction_index) || 0;
+                const avgPrice = d3.mean(brandData, d => d.price_per_kg_inr) || 0;
+                const avgRepeat = d3.mean(brandData, d => d.repeat_rate_pct) || 0;
+                const avgGrowth = d3.mean(brandData, d => d.market_growth_pct) || 0;
+
+                // FIX: Use global min/max for consistent scaling
+                const priceScore = globalMaxPrice === globalMinPrice ? 100 : 100 * (1 - ((avgPrice - globalMinPrice) / (globalMaxPrice - globalMinPrice)));
+                const growthScore = globalMaxGrowth === globalMinGrowth ? 100 : 100 * (avgGrowth - globalMinGrowth) / (globalMaxGrowth - globalMinGrowth);
+
+                return {
+                    label: brand,
+                    data: [avgSatisfaction, priceScore, avgRepeat, growthScore],
+                    borderColor: colorPalette[i % colorPalette.length],
+                    backgroundColor: colorPalette[i % colorPalette.length].replace(')', ', 0.2)').replace('rgb', 'rgba'),
+                    pointBackgroundColor: colorPalette[i % colorPalette.length],
+                };
+            });
+            radarChart.update();
+        };
+
+    </script>
+</body>
+</html>
+
