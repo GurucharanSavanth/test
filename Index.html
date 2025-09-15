@@ -1,0 +1,1463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pet Care Analytics Pro Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #06b6d4;
+        }
+        
+        .dashboard-card {
+            background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            backdrop-filter: blur(16px);
+            transition: all 0.3s ease;
+        }
+        
+        .dashboard-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+            border-color: rgba(99, 102, 241, 0.6);
+        }
+        
+        .metric-card {
+            background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+            border-left: 4px solid var(--primary);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .metric-card:hover {
+            transform: scale(1.02);
+            box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.3);
+        }
+        
+        .insight-card {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            backdrop-filter: blur(8px);
+        }
+        
+        .trend-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .trend-up { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+        .trend-down { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+        .trend-neutral { background: rgba(156, 163, 175, 0.2); color: #9ca3af; }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            transform: translateX(400px);
+            transition: transform 0.4s ease;
+        }
+        
+        .notification.show { transform: translateX(0); }
+        
+        .loading-spinner {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 3px solid var(--primary);
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.6s ease-out forwards;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .glass-button {
+            background: rgba(99, 102, 241, 0.1);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .glass-button:hover {
+            background: rgba(99, 102, 241, 0.2);
+            border-color: rgba(99, 102, 241, 0.5);
+            transform: translateY(-1px);
+        }
+        
+        .scrollbar-thin {
+            scrollbar-width: thin;
+            scrollbar-color: var(--primary) #374151;
+        }
+        
+        .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+        .scrollbar-thin::-webkit-scrollbar-track { background: #374151; border-radius: 3px; }
+        .scrollbar-thin::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 3px; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <!-- Notification System -->
+    <div id="notification" class="notification"></div>
+    
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-gray-900 bg-opacity-95 flex items-center justify-center z-50 hidden">
+        <div class="text-center">
+            <div class="loading-spinner mx-auto mb-6"></div>
+            <p class="text-2xl text-gray-300 mb-2" id="loadingText">Loading...</p>
+            <p class="text-sm text-gray-500" id="loadingSubtext">Processing your data...</p>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container mx-auto px-4 py-6 max-w-7xl">
+        <!-- Header -->
+        <header class="mb-8">
+            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+                <div>
+                    <h1 class="text-4xl lg:text-5xl font-black mb-2 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+                        Pet Care Analytics Pro
+                    </h1>
+                    <p class="text-gray-400 text-lg mb-2">Advanced Business Intelligence & Market Insights</p>
+                    <div id="dataStats" class="hidden text-sm text-gray-500">
+                        <span id="recordCount">0 records</span> • 
+                        <span id="categoryCount">0 categories</span> • 
+                        <span id="brandCount">0 brands</span> • 
+                        <span id="lastUpdated">Never updated</span>
+                    </div>
+                </div>
+                <div id="actionButtons" class="flex flex-wrap gap-3 hidden">
+                    <button id="exportBtn" class="glass-button px-6 py-3 rounded-xl font-semibold flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3"/>
+                        </svg>
+                        Export Data
+                    </button>
+                    <button id="refreshBtn" class="glass-button px-6 py-3 rounded-xl font-semibold flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        Refresh
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Data Input Section -->
+        <section id="dataInputSection" class="mb-8">
+            <div class="dashboard-card rounded-2xl p-8">
+                <h2 class="text-3xl font-bold mb-6 flex items-center gap-3">
+                    <span class="text-3xl">📊</span>
+                    Data Source
+                </h2>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-300 mb-3">Upload CSV File</label>
+                        <input type="file" id="csvInput" accept=".csv" 
+                               class="block w-full text-sm text-gray-400 file:mr-4 file:py-4 file:px-8 file:rounded-xl file:border-0 file:bg-gradient-to-r file:from-indigo-600 file:to-purple-600 file:text-white hover:file:from-indigo-700 hover:file:to-purple-700 file:transition-all file:font-semibold file:shadow-lg cursor-pointer border-2 border-dashed border-gray-600 rounded-xl p-4 hover:border-indigo-500 transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-300 mb-3">Quick Start</label>
+                        <button id="loadSampleBtn" class="w-full bg-gradient-to-r from-gray-700 to-gray-600 hover:from-gray-600 hover:to-gray-500 text-white py-4 px-6 rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl">
+                            Load Sample Dataset
+                        </button>
+                    </div>
+                </div>
+                <div id="fileStatus" class="mt-6 text-sm"></div>
+            </div>
+        </section>
+
+        <!-- Dashboard Content -->
+        <div id="dashboardContent" class="hidden space-y-8">
+            <!-- Filters Panel -->
+            <section class="dashboard-card rounded-2xl p-6">
+                <h2 class="text-2xl font-bold mb-4 flex items-center gap-3">
+                    <span class="text-2xl">🔍</span>
+                    Filters & Search
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-300 mb-2">Search</label>
+                        <input type="text" id="searchInput" placeholder="Search brands, categories..." 
+                               class="w-full bg-gray-800 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-300 mb-2">Category</label>
+                        <select id="categoryFilter" 
+                                class="w-full bg-gray-800 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-indigo-500 transition-all">
+                            <option value="">All Categories</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-300 mb-2">Brand</label>
+                        <select id="brandFilter" 
+                                class="w-full bg-gray-800 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-indigo-500 transition-all">
+                            <option value="">All Brands</option>
+                        </select>
+                    </div>
+                    <div>
+                        <button id="clearFiltersBtn" class="w-full mt-6 bg-red-600 hover:bg-red-700 text-white py-3 px-4 rounded-lg font-semibold transition-all">
+                            Clear All Filters
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Key Metrics -->
+            <section>
+                <h2 class="text-3xl font-bold mb-6 flex items-center gap-3">
+                    <span class="text-3xl">📈</span>
+                    Key Performance Indicators
+                </h2>
+                <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <!-- Metrics will be dynamically generated -->
+                </div>
+            </section>
+
+            <!-- Market Intelligence Section -->
+            <section class="dashboard-card rounded-2xl p-8">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold flex items-center gap-3">
+                        <span class="text-2xl">🧠</span>
+                        Market Intelligence
+                    </h2>
+                    <button id="toggleInsights" class="glass-button px-4 py-2 rounded-lg text-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div id="intelligenceContent" class="space-y-6">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="insight-card rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                                <span class="text-yellow-400">⭐</span>
+                                Market Leaders
+                            </h3>
+                            <div id="marketLeaders" class="space-y-3">
+                                <!-- Market leaders will be populated here -->
+                            </div>
+                        </div>
+                        
+                        <div class="insight-card rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                                <span class="text-green-400">📊</span>
+                                Growth Opportunities
+                            </h3>
+                            <div id="growthOpportunities" class="space-y-3">
+                                <!-- Growth opportunities will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Charts Section -->
+            <section>
+                <h2 class="text-3xl font-bold mb-6 flex items-center gap-3">
+                    <span class="text-3xl">📊</span>
+                    Analytics Dashboard
+                </h2>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Market Growth Chart -->
+                    <div class="dashboard-card rounded-2xl p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-semibold">Market Growth Trends</h3>
+                            <button class="chart-download text-gray-400 hover:text-white transition-colors" data-chart="growth">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="h-80">
+                            <canvas id="growthChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Funnel Chart -->
+                    <div class="dashboard-card rounded-2xl p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-semibold">Customer Journey Funnel</h3>
+                            <button class="chart-download text-gray-400 hover:text-white transition-colors" data-chart="funnel">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="h-80">
+                            <canvas id="funnelChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Category Distribution -->
+                    <div class="dashboard-card rounded-2xl p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-semibold">Market Share Distribution</h3>
+                            <button class="chart-download text-gray-400 hover:text-white transition-colors" data-chart="category">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="h-80">
+                            <canvas id="categoryChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Scatter Chart -->
+                    <div class="dashboard-card rounded-2xl p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-semibold">Price vs Satisfaction</h3>
+                            <button class="chart-download text-gray-400 hover:text-white transition-colors" data-chart="scatter">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="h-80">
+                            <canvas id="scatterChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Radar Chart -->
+                    <div class="dashboard-card rounded-2xl p-6 lg:col-span-2">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-semibold">Brand Comparison Analysis</h3>
+                            <button class="chart-download text-gray-400 hover:text-white transition-colors" data-chart="radar">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                            <div class="lg:col-span-1">
+                                <label class="block text-sm font-semibold text-gray-300 mb-2">Select Brands</label>
+                                <div id="brandSelection" class="bg-gray-800 bg-opacity-50 rounded-lg p-4 max-h-64 overflow-y-auto scrollbar-thin space-y-2">
+                                    <!-- Brand checkboxes will be generated here -->
+                                </div>
+                                <button id="selectAllBrands" class="mt-3 text-sm text-indigo-400 hover:text-indigo-300 transition-colors">
+                                    Select All
+                                </button>
+                            </div>
+                            <div class="lg:col-span-3 h-96">
+                                <canvas id="radarChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Data Table Section -->
+            <section class="dashboard-card rounded-2xl p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold flex items-center gap-3">
+                        <span class="text-2xl">📋</span>
+                        Detailed Data Table
+                    </h2>
+                    <button id="exportTableBtn" class="glass-button px-4 py-2 rounded-lg text-sm">
+                        Export Table
+                    </button>
+                </div>
+                
+                <div class="bg-gray-800 rounded-xl overflow-hidden">
+                    <div class="overflow-x-auto scrollbar-thin">
+                        <table id="dataTable" class="w-full text-sm">
+                            <thead class="bg-gray-700">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">Brand</th>
+                                    <th class="px-4 py-3 text-left font-semibold">Category</th>
+                                    <th class="px-4 py-3 text-right font-semibold">Satisfaction</th>
+                                    <th class="px-4 py-3 text-right font-semibold">Price (INR)</th>
+                                    <th class="px-4 py-3 text-right font-semibold">Growth (%)</th>
+                                    <th class="px-4 py-3 text-right font-semibold">Repeat Rate (%)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dataTableBody">
+                                <!-- Table rows will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Welcome Screen -->
+        <div id="welcomeScreen" class="text-center py-20">
+            <div class="max-w-4xl mx-auto">
+                <div class="text-9xl mb-8">📊</div>
+                <h2 class="text-4xl font-black mb-4 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+                    Welcome to Pet Care Analytics Pro
+                </h2>
+                <p class="text-xl text-gray-400 mb-8">Advanced market insights with AI-powered analytics and comprehensive business intelligence tools.</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="insight-card rounded-xl p-6">
+                        <div class="text-3xl mb-3">🤖</div>
+                        <h3 class="text-lg font-semibold mb-2">AI-Powered Insights</h3>
+                        <p class="text-sm text-gray-400">Advanced analytics to provide actionable business insights.</p>
+                    </div>
+                    <div class="insight-card rounded-xl p-6">
+                        <div class="text-3xl mb-3">📈</div>
+                        <h3 class="text-lg font-semibold mb-2">Real-time Analytics</h3>
+                        <p class="text-sm text-gray-400">Interactive dashboards with live data updates.</p>
+                    </div>
+                    <div class="insight-card rounded-xl p-6">
+                        <div class="text-3xl mb-3">🎯</div>
+                        <h3 class="text-lg font-semibold mb-2">Strategic Planning</h3>
+                        <p class="text-sm text-gray-400">Data-driven recommendations for growth strategies.</p>
+                    </div>
+                </div>
+                
+                <div class="bg-gray-800 rounded-2xl p-8 text-left">
+                    <h3 class="text-xl font-bold mb-4 text-center">Expected CSV Format</h3>
+                    <code class="text-xs text-gray-300 block bg-gray-900 p-4 rounded-lg">
+month, category, brand, sample_size, satisfaction_index, market_growth_pct,
+funnel_conversation_idx, funnel_consideration_idx, funnel_trial_idx,
+funnel_repeat_idx, price_per_kg_inr, repeat_rate_pct
+                    </code>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== GLOBAL DASHBOARD VARIABLE =====
+        let dashboard;
+
+        // ===== MAIN DASHBOARD CLASS =====
+        class PetCareAnalyticsPro {
+            constructor() {
+                this.state = {
+                    rawData: [],
+                    filteredData: [],
+                    charts: new Map(),
+                    isInitialized: false
+                };
+                
+                this.config = {
+                    requiredColumns: [
+                        'month', 'category', 'brand', 'sample_size', 'satisfaction_index',
+                        'market_growth_pct', 'funnel_conversation_idx', 'funnel_consideration_idx',
+                        'funnel_trial_idx', 'funnel_repeat_idx', 'price_per_kg_inr', 'repeat_rate_pct'
+                    ],
+                    chartColors: {
+                        primary: '#6366f1',
+                        secondary: '#8b5cf6',
+                        success: '#10b981',
+                        warning: '#f59e0b',
+                        danger: '#ef4444',
+                        info: '#06b6d4'
+                    }
+                };
+                
+                this.init();
+            }
+            
+            init() {
+                try {
+                    this.setupEventListeners();
+                    this.showWelcomeScreen();
+                    console.log('🚀 Dashboard initialized successfully');
+                } catch (error) {
+                    console.error('❌ Dashboard initialization error:', error);
+                    this.showNotification('Failed to initialize dashboard', 'error');
+                }
+            }
+            
+            setupEventListeners() {
+                // File operations
+                this.safeAddEventListener('csvInput', 'change', (e) => this.handleFileUpload(e));
+                this.safeAddEventListener('loadSampleBtn', 'click', () => this.loadSampleData());
+                
+                // Filter operations
+                this.safeAddEventListener('searchInput', 'input', this.debounce(() => this.applyFilters(), 300));
+                this.safeAddEventListener('categoryFilter', 'change', () => this.applyFilters());
+                this.safeAddEventListener('brandFilter', 'change', () => this.applyFilters());
+                this.safeAddEventListener('clearFiltersBtn', 'click', () => this.clearAllFilters());
+                
+                // UI toggles
+                this.safeAddEventListener('toggleInsights', 'click', () => this.toggleInsights());
+                
+                // Actions
+                this.safeAddEventListener('exportBtn', 'click', () => this.exportData());
+                this.safeAddEventListener('refreshBtn', 'click', () => this.refreshDashboard());
+                this.safeAddEventListener('exportTableBtn', 'click', () => this.exportTable());
+                
+                // Brand selection
+                this.safeAddEventListener('selectAllBrands', 'click', () => this.toggleAllBrands());
+                
+                // Chart downloads
+                document.querySelectorAll('.chart-download').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const chartType = e.currentTarget.getAttribute('data-chart');
+                        if (chartType) this.downloadChart(chartType);
+                    });
+                });
+            }
+            
+            safeAddEventListener(elementId, event, handler) {
+                const element = document.getElementById(elementId);
+                if (element) {
+                    element.addEventListener(event, handler);
+                } else {
+                    console.warn(`⚠️ Element not found: ${elementId}`);
+                }
+            }
+            
+            async handleFileUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                
+                try {
+                    this.showLoading(`Processing ${file.name}...`);
+                    
+                    const text = await this.readFile(file);
+                    const data = d3.csvParse(text);
+                    
+                    this.validateData(data);
+                    await this.processData(data);
+                    await this.initializeDashboard();
+                    
+                    this.showNotification(`✅ Successfully loaded ${file.name}`, 'success');
+                    this.updateDataStats();
+                } catch (error) {
+                    console.error('❌ File upload error:', error);
+                    this.showNotification(`❌ ${error.message}`, 'error');
+                } finally {
+                    this.hideLoading();
+                }
+            }
+            
+            async loadSampleData() {
+                try {
+                    this.showLoading('Generating sample data...');
+                    
+                    const sampleData = this.generateSampleData();
+                    await this.processData(sampleData);
+                    await this.initializeDashboard();
+                    
+                    this.showNotification('✅ Sample data loaded successfully', 'success');
+                    this.updateDataStats();
+                } catch (error) {
+                    console.error('❌ Sample data error:', error);
+                    this.showNotification(`❌ ${error.message}`, 'error');
+                } finally {
+                    this.hideLoading();
+                }
+            }
+            
+            generateSampleData() {
+                const categories = ['Premium Dog Food', 'Cat Food', 'Pet Accessories', 'Pet Grooming', 'Veterinary Care'];
+                const brands = ['PetPro Elite', 'HealthyPaws Premium', 'NaturalPet Organic', 'PremiumCare Plus', 'PetDelight Pro'];
+                const months = ['Jan-24', 'Feb-24', 'Mar-24', 'Apr-24', 'May-24', 'Jun-24'];
+                
+                const data = [];
+                
+                for (const month of months) {
+                    for (const category of categories) {
+                        for (const brand of brands) {
+                            data.push({
+                                month,
+                                category,
+                                brand,
+                                sample_size: Math.floor(Math.random() * 600) + 200,
+                                satisfaction_index: Math.random() * 30 + 70,
+                                market_growth_pct: Math.random() * 25 + 5,
+                                funnel_conversation_idx: Math.random() * 20 + 80,
+                                funnel_consideration_idx: Math.random() * 25 + 65,
+                                funnel_trial_idx: Math.random() * 30 + 50,
+                                funnel_repeat_idx: Math.random() * 25 + 40,
+                                price_per_kg_inr: Math.random() * 800 + 400,
+                                repeat_rate_pct: Math.random() * 40 + 40
+                            });
+                        }
+                    }
+                }
+                
+                return data;
+            }
+            
+            validateData(data) {
+                if (!Array.isArray(data) || data.length === 0) {
+                    throw new Error('Empty or invalid dataset provided');
+                }
+                
+                const columns = data.columns || Object.keys(data[0] || {});
+                const missingColumns = this.config.requiredColumns.filter(col => !columns.includes(col));
+                
+                if (missingColumns.length > 0) {
+                    throw new Error(`Missing required columns: ${missingColumns.join(', ')}`);
+                }
+                
+                console.log(`✅ Data validation passed: ${data.length} rows`);
+            }
+            
+            async processData(rawData) {
+                try {
+                    this.state.rawData = rawData.map(d => ({
+                        month: String(d.month || '').trim(),
+                        category: String(d.category || '').trim(),
+                        brand: String(d.brand || '').trim(),
+                        sample_size: this.parseNumber(d.sample_size, 0),
+                        satisfaction_index: this.parseNumber(d.satisfaction_index, 0),
+                        market_growth_pct: this.parseNumber(d.market_growth_pct, 0),
+                        funnel_conversation_idx: this.parseNumber(d.funnel_conversation_idx, 0),
+                        funnel_consideration_idx: this.parseNumber(d.funnel_consideration_idx, 0),
+                        funnel_trial_idx: this.parseNumber(d.funnel_trial_idx, 0),
+                        funnel_repeat_idx: this.parseNumber(d.funnel_repeat_idx, 0),
+                        price_per_kg_inr: this.parseNumber(d.price_per_kg_inr, 0),
+                        repeat_rate_pct: this.parseNumber(d.repeat_rate_pct, 0),
+                        date: this.parseDate(d.month)
+                    }));
+                    
+                    // Clean data
+                    this.state.rawData = this.state.rawData.filter(d => 
+                        d.month && d.category && d.brand && 
+                        d.sample_size > 0 && d.satisfaction_index > 0
+                    );
+                    
+                    if (this.state.rawData.length === 0) {
+                        throw new Error('No valid records found after processing');
+                    }
+                    
+                    this.state.filteredData = [...this.state.rawData];
+                    console.log(`✅ Processed ${this.state.rawData.length} valid records`);
+                } catch (error) {
+                    throw new Error(`Data processing failed: ${error.message}`);
+                }
+            }
+            
+            parseNumber(value, defaultValue = 0) {
+                if (value === null || value === undefined || value === '') return defaultValue;
+                const parsed = parseFloat(String(value).replace(/[^\d.-]/g, ''));
+                return isNaN(parsed) ? defaultValue : parsed;
+            }
+            
+            parseDate(monthStr) {
+                try {
+                    if (!monthStr || typeof monthStr !== 'string' || !monthStr.includes('-')) {
+                        return null;
+                    }
+                    
+                    const [mon, year] = monthStr.split('-');
+                    const monthMap = {
+                        Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+                        Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11
+                    };
+                    
+                    const monthIndex = monthMap[mon];
+                    if (monthIndex === undefined) return null;
+                    
+                    const fullYear = year?.length === 2 ? `20${year}` : year;
+                    const yearNum = parseInt(fullYear);
+                    
+                    if (isNaN(yearNum)) return null;
+                    
+                    return new Date(yearNum, monthIndex, 1);
+                } catch (error) {
+                    return null;
+                }
+            }
+            
+            async initializeDashboard() {
+                try {
+                    this.hideWelcomeScreen();
+                    this.showDashboard();
+                    this.populateFilters();
+                    this.createCharts();
+                    this.updateDashboard();
+                    this.populateDataTable();
+                    
+                    this.state.isInitialized = true;
+                    console.log('✅ Dashboard initialized');
+                } catch (error) {
+                    throw new Error(`Dashboard initialization failed: ${error.message}`);
+                }
+            }
+            
+            populateFilters() {
+                try {
+                    const categories = [...new Set(this.state.rawData.map(d => d.category))].sort();
+                    const brands = [...new Set(this.state.rawData.map(d => d.brand))].sort();
+                    
+                    this.populateSelect('categoryFilter', categories, 'All Categories');
+                    this.populateSelect('brandFilter', brands, 'All Brands');
+                    this.populateBrandSelection(brands);
+                    
+                    console.log(`✅ Filters populated`);
+                } catch (error) {
+                    console.error('❌ Filter population error:', error);
+                }
+            }
+            
+            populateSelect(elementId, options, defaultText) {
+                const select = document.getElementById(elementId);
+                if (!select) return;
+                
+                select.innerHTML = `<option value="">${defaultText}</option>`;
+                options.forEach(option => {
+                    const optionEl = document.createElement('option');
+                    optionEl.value = option;
+                    optionEl.textContent = option;
+                    select.appendChild(optionEl);
+                });
+            }
+            
+            populateBrandSelection(brands) {
+                const container = document.getElementById('brandSelection');
+                if (!container) return;
+                
+                container.innerHTML = '';
+                brands.forEach((brand, index) => {
+                    const div = document.createElement('div');
+                    div.className = 'flex items-center space-x-2 p-2 rounded hover:bg-gray-700 transition-colors';
+                    div.innerHTML = `
+                        <input type="checkbox" id="brand-${index}" value="${brand}" 
+                               class="rounded border-gray-600 bg-gray-700 text-indigo-600">
+                        <label for="brand-${index}" class="text-sm text-gray-300 cursor-pointer flex-1">${brand}</label>
+                    `;
+                    container.appendChild(div);
+                    
+                    // Add event listener for radar chart update
+                    const checkbox = div.querySelector('input');
+                    if (checkbox) {
+                        checkbox.addEventListener('change', () => this.updateRadarChart());
+                    }
+                });
+            }
+            
+            createCharts() {
+                try {
+                    // Destroy existing charts
+                    this.state.charts.forEach(chart => {
+                        try { chart.destroy(); } catch (e) {}
+                    });
+                    this.state.charts.clear();
+                    
+                    // Create new charts
+                    const chartConfigs = [
+                        { id: 'growthChart', type: 'line', key: 'growth' },
+                        { id: 'funnelChart', type: 'bar', key: 'funnel' },
+                        { id: 'categoryChart', type: 'doughnut', key: 'category' },
+                        { id: 'scatterChart', type: 'scatter', key: 'scatter' },
+                        { id: 'radarChart', type: 'radar', key: 'radar' }
+                    ];
+                    
+                    chartConfigs.forEach(config => {
+                        const canvas = document.getElementById(config.id);
+                        if (canvas) {
+                            const chart = new Chart(canvas, {
+                                type: config.type,
+                                data: { labels: [], datasets: [] },
+                                options: this.getChartOptions(config.type)
+                            });
+                            this.state.charts.set(config.key, chart);
+                        }
+                    });
+                    
+                    console.log('✅ Charts created');
+                } catch (error) {
+                    console.error('❌ Chart creation error:', error);
+                }
+            }
+            
+            getChartOptions(type) {
+                const baseOptions = {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    plugins: {
+                        legend: { labels: { color: '#e5e7eb' } },
+                        tooltip: {
+                            titleColor: '#ffffff',
+                            bodyColor: '#e5e7eb',
+                            backgroundColor: 'rgba(17, 24, 39, 0.9)'
+                        }
+                    }
+                };
+                
+                switch (type) {
+                    case 'line':
+                        return {
+                            ...baseOptions,
+                            scales: {
+                                x: { ticks: { color: '#9ca3af' } },
+                                y: { 
+                                    ticks: { 
+                                        color: '#9ca3af',
+                                        callback: (value) => `${value}%`
+                                    }
+                                }
+                            }
+                        };
+                    case 'bar':
+                        return {
+                            ...baseOptions,
+                            indexAxis: 'y',
+                            scales: {
+                                x: { ticks: { color: '#9ca3af' } },
+                                y: { ticks: { color: '#9ca3af' } }
+                            }
+                        };
+                    case 'doughnut':
+                        return {
+                            ...baseOptions,
+                            plugins: {
+                                ...baseOptions.plugins,
+                                legend: { position: 'right', labels: { color: '#e5e7eb' } }
+                            }
+                        };
+                    case 'scatter':
+                        return {
+                            ...baseOptions,
+                            scales: {
+                                x: { 
+                                    title: { display: true, text: 'Price (INR)', color: '#e5e7eb' },
+                                    ticks: { color: '#9ca3af' }
+                                },
+                                y: { 
+                                    title: { display: true, text: 'Satisfaction', color: '#e5e7eb' },
+                                    ticks: { color: '#9ca3af' }
+                                }
+                            }
+                        };
+                    case 'radar':
+                        return {
+                            ...baseOptions,
+                            scales: {
+                                r: {
+                                    beginAtZero: true,
+                                    max: 100,
+                                    pointLabels: { color: '#e5e7eb' },
+                                    ticks: { color: '#9ca3af', backdropColor: 'transparent' },
+                                    grid: { color: 'rgba(75, 85, 99, 0.3)' }
+                                }
+                            }
+                        };
+                    default:
+                        return baseOptions;
+                }
+            }
+            
+            applyFilters() {
+                try {
+                    const searchTerm = (document.getElementById('searchInput')?.value || '').toLowerCase();
+                    const category = document.getElementById('categoryFilter')?.value || '';
+                    const brand = document.getElementById('brandFilter')?.value || '';
+                    
+                    this.state.filteredData = this.state.rawData.filter(item => {
+                        const matchesSearch = !searchTerm || 
+                            item.brand.toLowerCase().includes(searchTerm) ||
+                            item.category.toLowerCase().includes(searchTerm);
+                        const matchesCategory = !category || item.category === category;
+                        const matchesBrand = !brand || item.brand === brand;
+                        
+                        return matchesSearch && matchesCategory && matchesBrand;
+                    });
+                    
+                    this.updateDashboard();
+                    this.populateDataTable();
+                } catch (error) {
+                    console.error('❌ Filter error:', error);
+                }
+            }
+            
+            clearAllFilters() {
+                try {
+                    const elements = ['searchInput', 'categoryFilter', 'brandFilter'];
+                    elements.forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) el.value = '';
+                    });
+                    
+                    document.querySelectorAll('#brandSelection input[type="checkbox"]')
+                        .forEach(cb => cb.checked = false);
+                    
+                    this.state.filteredData = [...this.state.rawData];
+                    this.updateDashboard();
+                    this.populateDataTable();
+                    this.showNotification('🧹 Filters cleared', 'success');
+                } catch (error) {
+                    console.error('❌ Clear filters error:', error);
+                }
+            }
+            
+            updateDashboard() {
+                if (!this.state.isInitialized) return;
+                
+                try {
+                    this.updateMetrics();
+                    this.generateInsights();
+                    this.updateAllCharts();
+                } catch (error) {
+                    console.error('❌ Dashboard update error:', error);
+                }
+            }
+            
+            updateMetrics() {
+                try {
+                    const data = this.state.filteredData;
+                    if (data.length === 0) {
+                        this.clearMetrics();
+                        return;
+                    }
+                    
+                    const metrics = {
+                        avgSatisfaction: d3.mean(data, d => d.satisfaction_index) || 0,
+                        avgPrice: d3.mean(data, d => d.price_per_kg_inr) || 0,
+                        avgRepeatRate: d3.mean(data, d => d.repeat_rate_pct) || 0,
+                        avgGrowth: d3.mean(data, d => d.market_growth_pct) || 0
+                    };
+                    
+                    const metricsConfig = [
+                        { key: 'avgSatisfaction', label: 'Customer Satisfaction', icon: '😊', color: 'text-green-400', format: v => v.toFixed(1) },
+                        { key: 'avgPrice', label: 'Average Price/kg', icon: '💰', color: 'text-blue-400', format: v => `₹${Math.round(v).toLocaleString()}` },
+                        { key: 'avgRepeatRate', label: 'Repeat Rate', icon: '🔄', color: 'text-purple-400', format: v => `${v.toFixed(1)}%` },
+                        { key: 'avgGrowth', label: 'Market Growth', icon: '📈', color: 'text-orange-400', format: v => `${v.toFixed(1)}%` }
+                    ];
+                    
+                    const container = document.getElementById('metricsGrid');
+                    if (container) {
+                        container.innerHTML = '';
+                        metricsConfig.forEach(config => {
+                            const card = document.createElement('div');
+                            card.className = 'metric-card rounded-xl p-6 fade-in';
+                            card.innerHTML = `
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="text-3xl">${config.icon}</span>
+                                </div>
+                                <h3 class="text-sm font-semibold text-gray-400 mb-2">${config.label}</h3>
+                                <p class="${config.color} text-3xl font-bold">${config.format(metrics[config.key])}</p>
+                            `;
+                            container.appendChild(card);
+                        });
+                    }
+                } catch (error) {
+                    console.error('❌ Metrics update error:', error);
+                }
+            }
+            
+            clearMetrics() {
+                const container = document.getElementById('metricsGrid');
+                if (container) {
+                    container.innerHTML = '<div class="col-span-4 text-center text-gray-400 py-8">No data available</div>';
+                }
+            }
+            
+            generateInsights() {
+                try {
+                    const data = this.state.filteredData;
+                    if (data.length === 0) return;
+                    
+                    // Market Leaders
+                    const brandGroups = d3.group(data, d => d.brand);
+                    const leaders = Array.from(brandGroups, ([brand, items]) => ({
+                        name: brand,
+                        satisfaction: d3.mean(items, d => d.satisfaction_index),
+                        growth: d3.mean(items, d => d.market_growth_pct)
+                    })).sort((a, b) => b.satisfaction - a.satisfaction).slice(0, 3);
+                    
+                    const leadersContainer = document.getElementById('marketLeaders');
+                    if (leadersContainer) {
+                        leadersContainer.innerHTML = leaders.map(leader => `
+                            <div class="flex items-center justify-between p-3 bg-gray-800 bg-opacity-50 rounded-lg">
+                                <span class="font-semibold text-white">${leader.name}</span>
+                                <div class="text-right">
+                                    <div class="font-bold text-green-400">${leader.satisfaction.toFixed(1)}</div>
+                                    <div class="text-xs text-gray-400">Score</div>
+                                </div>
+                            </div>
+                        `).join('');
+                    }
+                    
+                    // Growth Opportunities
+                    const categoryGroups = d3.group(data, d => d.category);
+                    const opportunities = Array.from(categoryGroups, ([category, items]) => ({
+                        segment: category,
+                        potential: d3.mean(items, d => d.market_growth_pct)
+                    })).sort((a, b) => b.potential - a.potential).slice(0, 3);
+                    
+                    const opportunitiesContainer = document.getElementById('growthOpportunities');
+                    if (opportunitiesContainer) {
+                        opportunitiesContainer.innerHTML = opportunities.map(opp => `
+                            <div class="flex items-center justify-between p-3 bg-gray-800 bg-opacity-50 rounded-lg">
+                                <span class="font-semibold text-white">${opp.segment}</span>
+                                <div class="text-right">
+                                    <div class="font-bold text-green-400">${opp.potential.toFixed(1)}%</div>
+                                    <div class="text-xs text-gray-400">Growth</div>
+                                </div>
+                            </div>
+                        `).join('');
+                    }
+                } catch (error) {
+                    console.error('❌ Insights error:', error);
+                }
+            }
+            
+            updateAllCharts() {
+                try {
+                    this.updateGrowthChart();
+                    this.updateFunnelChart();
+                    this.updateCategoryChart();
+                    this.updateScatterChart();
+                    this.updateRadarChart();
+                } catch (error) {
+                    console.error('❌ Charts update error:', error);
+                }
+            }
+            
+            updateGrowthChart() {
+                const chart = this.state.charts.get('growth');
+                if (!chart) return;
+                
+                const data = this.state.filteredData.filter(d => d.date);
+                if (!data.length) {
+                    chart.data = { labels: [], datasets: [] };
+                    chart.update();
+                    return;
+                }
+                
+                const monthlyData = d3.group(data, d => d.date.toISOString().slice(0, 7));
+                const chartData = Array.from(monthlyData, ([month, items]) => ({
+                    month: new Date(month + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+                    growth: d3.mean(items, d => d.market_growth_pct) || 0
+                })).sort((a, b) => a.month.localeCompare(b.month));
+                
+                chart.data = {
+                    labels: chartData.map(d => d.month),
+                    datasets: [{
+                        label: 'Market Growth %',
+                        data: chartData.map(d => d.growth),
+                        borderColor: this.config.chartColors.primary,
+                        backgroundColor: `${this.config.chartColors.primary}20`,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                };
+                chart.update();
+            }
+            
+            updateFunnelChart() {
+                const chart = this.state.charts.get('funnel');
+                if (!chart) return;
+                
+                const data = this.state.filteredData;
+                if (!data.length) {
+                    chart.data = { labels: [], datasets: [] };
+                    chart.update();
+                    return;
+                }
+                
+                const funnelData = [
+                    d3.mean(data, d => d.funnel_conversation_idx) || 0,
+                    d3.mean(data, d => d.funnel_consideration_idx) || 0,
+                    d3.mean(data, d => d.funnel_trial_idx) || 0,
+                    d3.mean(data, d => d.funnel_repeat_idx) || 0
+                ];
+                
+                chart.data = {
+                    labels: ['Conversation', 'Consideration', 'Trial', 'Repeat'],
+                    datasets: [{
+                        data: funnelData,
+                        backgroundColor: [
+                            this.config.chartColors.primary,
+                            this.config.chartColors.info,
+                            this.config.chartColors.success,
+                            this.config.chartColors.warning
+                        ]
+                    }]
+                };
+                chart.update();
+            }
+            
+            updateCategoryChart() {
+                const chart = this.state.charts.get('category');
+                if (!chart) return;
+                
+                const data = this.state.filteredData;
+                if (!data.length) {
+                    chart.data = { labels: [], datasets: [] };
+                    chart.update();
+                    return;
+                }
+                
+                const categoryTotals = d3.rollup(data, v => d3.sum(v, d => d.sample_size), d => d.category);
+                const sortedData = Array.from(categoryTotals.entries()).sort((a, b) => b[1] - a[1]);
+                
+                chart.data = {
+                    labels: sortedData.map(d => d[0]),
+                    datasets: [{
+                        data: sortedData.map(d => d[1]),
+                        backgroundColor: [
+                            '#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'
+                        ]
+                    }]
+                };
+                chart.update();
+            }
+            
+            updateScatterChart() {
+                const chart = this.state.charts.get('scatter');
+                if (!chart) return;
+                
+                const data = this.state.filteredData;
+                if (!data.length) {
+                    chart.data = { datasets: [] };
+                    chart.update();
+                    return;
+                }
+                
+                chart.data = {
+                    datasets: [{
+                        label: 'Price vs Satisfaction',
+                        data: data.map(d => ({
+                            x: d.price_per_kg_inr,
+                            y: d.satisfaction_index,
+                            brand: d.brand
+                        })),
+                        backgroundColor: this.config.chartColors.primary,
+                        pointRadius: 5,
+                        pointHoverRadius: 7
+                    }]
+                };
+                chart.update();
+            }
+            
+            updateRadarChart() {
+                const chart = this.state.charts.get('radar');
+                if (!chart) return;
+                
+                const selectedBrands = Array.from(document.querySelectorAll('#brandSelection input:checked'))
+                    .map(cb => cb.value);
+                
+                if (!selectedBrands.length) {
+                    chart.data = { labels: [], datasets: [] };
+                    chart.update();
+                    return;
+                }
+                
+                const colors = [
+                    this.config.chartColors.primary,
+                    this.config.chartColors.success,
+                    this.config.chartColors.warning,
+                    this.config.chartColors.danger,
+                    this.config.chartColors.info
+                ];
+                
+                chart.data = {
+                    labels: ['Satisfaction', 'Value for Money', 'Repeat Rate', 'Growth'],
+                    datasets: selectedBrands.map((brand, i) => {
+                        const brandData = this.state.rawData.filter(d => d.brand === brand);
+                        
+                        if (!brandData.length) {
+                            return {
+                                label: brand,
+                                data: [0, 0, 0, 0],
+                                borderColor: colors[i % colors.length],
+                                backgroundColor: `${colors[i % colors.length]}30`
+                            };
+                        }
+                        
+                        const satisfaction = d3.mean(brandData, d => d.satisfaction_index) || 0;
+                        const avgPrice = d3.mean(brandData, d => d.price_per_kg_inr) || 0;
+                        const repeatRate = d3.mean(brandData, d => d.repeat_rate_pct) || 0;
+                        const growth = d3.mean(brandData, d => d.market_growth_pct) || 0;
+                        
+                        // Simple normalization
+                        const valueScore = Math.max(0, 100 - (avgPrice / 10));
+                        
+                        return {
+                            label: brand,
+                            data: [
+                                Math.min(100, satisfaction),
+                                Math.min(100, valueScore),
+                                Math.min(100, repeatRate),
+                                Math.min(100, growth)
+                            ],
+                            borderColor: colors[i % colors.length],
+                            backgroundColor: `${colors[i % colors.length]}30`,
+                            pointRadius: 4
+                        };
+                    })
+                };
+                chart.update();
+            }
+            
+            populateDataTable() {
+                try {
+                    const tbody = document.getElementById('dataTableBody');
+                    if (!tbody) return;
+                    
+                    const data = this.state.filteredData.slice(0, 50); // Limit for performance
+                    
+                    tbody.innerHTML = data.map(item => `
+                        <tr class="border-b border-gray-700 hover:bg-gray-800 transition-colors">
+                            <td class="px-4 py-3 font-medium">${item.brand}</td>
+                            <td class="px-4 py-3 text-gray-300">${item.category}</td>
+                            <td class="px-4 py-3 text-right">${item.satisfaction_index.toFixed(1)}</td>
+                            <td class="px-4 py-3 text-right">₹${Math.round(item.price_per_kg_inr).toLocaleString()}</td>
+                            <td class="px-4 py-3 text-right">${item.market_growth_pct.toFixed(1)}%</td>
+                            <td class="px-4 py-3 text-right">${item.repeat_rate_pct.toFixed(1)}%</td>
+                        </tr>
+                    `).join('');
+                } catch (error) {
+                    console.error('❌ Data table error:', error);
+                }
+            }
+            
+            toggleAllBrands() {
+                try {
+                    const checkboxes = document.querySelectorAll('#brandSelection input[type="checkbox"]');
+                    const button = document.getElementById('selectAllBrands');
+                    
+                    if (!checkboxes.length || !button) return;
+                    
+                    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+                    
+                    checkboxes.forEach(cb => {
+                        cb.checked = !allChecked;
+                    });
+                    
+                    button.textContent = allChecked ? 'Select All' : 'Clear All';
+                    this.updateRadarChart();
+                } catch (error) {
+                    console.error('❌ Toggle brands error:', error);
+                }
+            }
+            
+            toggleInsights() {
+                // Simple toggle implementation
+                console.log('Toggle insights clicked');
+            }
+            
+            exportData() {
+                try {
+                    if (!this.state.filteredData.length) {
+                        this.showNotification('❌ No data to export', 'error');
+                        return;
+                    }
+                    
+                    const csv = d3.csvFormat(this.state.filteredData);
+                    const blob = new Blob([csv], { type: 'text/csv' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `pet-care-data-${new Date().toISOString().slice(0, 10)}.csv`;
+                    a.click();
+                    
+                    URL.revokeObjectURL(url);
+                    this.showNotification('📊 Data exported successfully', 'success');
+                } catch (error) {
+                    console.error('❌ Export error:', error);
+                }
+            }
+            
+            exportTable() {
+                try {
+                    const table = document.getElementById('dataTable');
+                    if (!table) return;
+                    
+                    let csv = 'Brand,Category,Satisfaction,Price,Growth,Repeat Rate\n';
+                    
+                    const rows = Array.from(table.querySelectorAll('tbody tr'));
+                    rows.forEach(row => {
+                        const cells = Array.from(row.querySelectorAll('td')).map(td => 
+                            td.textContent.trim().replace(/,/g, ';')
+                        );
+                        csv += cells.join(',') + '\n';
+                    });
+                    
+                    const blob = new Blob([csv], { type: 'text/csv' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `pet-care-table-${Date.now()}.csv`;
+                    a.click();
+                    
+                    URL.revokeObjectURL(url);
+                    this.showNotification('📋 Table exported', 'success');
+                } catch (error) {
+                    console.error('❌ Table export error:', error);
+                }
+            }
+            
+            downloadChart(chartType) {
+                try {
+                    const chart = this.state.charts.get(chartType);
+                    if (!chart) {
+                        this.showNotification('❌ Chart not found', 'error');
+                        return;
+                    }
+                    
+                    const url = chart.toBase64Image();
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${chartType}-chart-${Date.now()}.png`;
+                    a.click();
+                    
+                    this.showNotification('📈 Chart downloaded', 'success');
+                } catch (error) {
+                    console.error('❌ Chart download error:', error);
+                }
+            }
+            
+            refreshDashboard() {
+                try {
+                    this.updateDashboard();
+                    this.updateDataStats();
+                    this.showNotification('🔄 Dashboard refreshed', 'success');
+                } catch (error) {
+                    console.error('❌ Refresh error:', error);
+                }
+            }
+            
+            updateDataStats() {
+                try {
+                    const stats = document.getElementById('dataStats');
+                    if (!stats) return;
+                    
+                    const elements = {
+                        recordCount: document.getElementById('recordCount'),
+                        categoryCount: document.getElementById('categoryCount'),
+                        brandCount: document.getElementById('brandCount'),
+                        lastUpdated: document.getElementById('lastUpdated')
+                    };
+                    
+                    if (elements.recordCount) elements.recordCount.textContent = `${this.state.rawData.length} records`;
+                    if (elements.categoryCount) elements.categoryCount.textContent = `${new Set(this.state.rawData.map(d => d.category)).size} categories`;
+                    if (elements.brandCount) elements.brandCount.textContent = `${new Set(this.state.rawData.map(d => d.brand)).size} brands`;
+                    if (elements.lastUpdated) elements.lastUpdated.textContent = `Updated ${new Date().toLocaleTimeString()}`;
+                    
+                    stats.classList.remove('hidden');
+                } catch (error) {
+                    console.error('❌ Stats update error:', error);
+                }
+            }
+            
+            // UI Helper Methods
+            showLoading(message = 'Loading...', subtext = 'Please wait...') {
+                const overlay = document.getElementById('loadingOverlay');
+                const text = document.getElementById('loadingText');
+                const subText = document.getElementById('loadingSubtext');
+                
+                if (overlay) overlay.classList.remove('hidden');
+                if (text) text.textContent = message;
+                if (subText) subText.textContent = subtext;
+            }
+            
+            hideLoading() {
+                const overlay = document.getElementById('loadingOverlay');
+                if (overlay) overlay.classList.add('hidden');
+            }
+            
+            showNotification(message, type = 'success') {
+                const notification = document.getElementById('notification');
+                if (!notification) return;
+                
+                const bgColor = type === 'success' ? 'bg-green-600' : type === 'error' ? 'bg-red-600' : 'bg-blue-600';
+                const icon = type === 'success' ? '✓' : type === 'error' ? '✗' : 'ℹ';
+                
+                notification.innerHTML = `
+                    <div class="${bgColor} rounded-lg p-4 shadow-lg border border-gray-600 max-w-sm">
+                        <div class="flex items-center">
+                            <span class="text-white mr-2 font-bold">${icon}</span>
+                            <span class="text-white font-medium text-sm">${message}</span>
+                        </div>
+                    </div>
+                `;
+                
+                notification.classList.add('show');
+                setTimeout(() => notification.classList.remove('show'), 4000);
+            }
+            
+            showWelcomeScreen() {
+                const welcome = document.getElementById('welcomeScreen');
+                const dashboard = document.getElementById('dashboardContent');
+                const actions = document.getElementById('actionButtons');
+                
+                if (welcome) welcome.classList.remove('hidden');
+                if (dashboard) dashboard.classList.add('hidden');
+                if (actions) actions.classList.add('hidden');
+            }
+            
+            hideWelcomeScreen() {
+                const welcome = document.getElementById('welcomeScreen');
+                if (welcome) welcome.classList.add('hidden');
+            }
+            
+            showDashboard() {
+                const dashboard = document.getElementById('dashboardContent');
+                const actions = document.getElementById('actionButtons');
+                
+                if (dashboard) dashboard.classList.remove('hidden');
+                if (actions) actions.classList.remove('hidden');
+            }
+            
+            debounce(func, wait) {
+                let timeout;
+                return function executedFunction(...args) {
+                    const later = () => {
+                        clearTimeout(timeout);
+                        func.apply(this, args);
+                    };
+                    clearTimeout(timeout);
+                    timeout = setTimeout(later, wait);
+                };
+            }
+            
+            readFile(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(e.target.result);
+                    reader.onerror = () => reject(new Error('Failed to read file'));
+                    reader.readAsText(file);
+                });
+            }
+        }
+        
+        // ===== INITIALIZE DASHBOARD =====
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                dashboard = new PetCareAnalyticsPro();
+                window.dashboard = dashboard; // Global access for debugging
+            } catch (error) {
+                console.error('❌ Failed to initialize dashboard:', error);
+            }
+        });
+    </script>
+</body>
+</html>
